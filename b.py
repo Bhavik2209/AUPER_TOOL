@@ -1,11 +1,8 @@
 import streamlit as st
 import PyPDF2
-import os
-from gtts import gTTS
 import pyttsx3
 import google.generativeai as genai
 import re
-import tempfile
 from streamlit_extras.stylable_container import stylable_container
 from streamlit_option_menu import option_menu
 import time
