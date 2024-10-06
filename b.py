@@ -13,11 +13,16 @@ GOOGLE_API_KEY = st.secrets['default']['GOOGLE_API_KEY']
 genai.configure(api_key=GOOGLE_API_KEY)
 
 def extract_text_from_pdf(file):
-    reader = PyPDF2.PdfReader(file)
-    text = ""
-    for page in reader.pages:
-        text += page.extract_text()
-    return text
+    try:
+        reader = PyPDF2.PdfReader(file)
+        text = ""
+        for page in reader.pages:
+            text += page.extract_text()
+        return text
+    except Exception as e:
+        st.error(f"Failed to read the PDF file: {e}")
+        return ""
+
 
 def chunk_text(text, chunk_size=3000):
     words = text.split()
@@ -37,24 +42,32 @@ def chunk_text(text, chunk_size=3000):
     return chunks
 
 def summarize_with_gemini(text):
-    model = genai.GenerativeModel('gemini-pro')
-    prompt = f"Please provide a detailed summary of the following text. Note that this summary will be used to convert into an audio podcast, so write accordingly, explaining all key points in simple words:\n\n{text}"
-    response = model.generate_content(prompt)
-    return response.text
+    try:
+        model = genai.GenerativeModel('gemini-pro')
+        prompt = f"Please provide a detailed summary of the following text. Note that this summary will be used to convert into an audio podcast, so write accordingly, explaining all key points in simple words:\n\n{text}"
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        st.error(f"An error occurred while summarizing: {e}")
+        return ""
+
 
 def clean_text_for_speech(text):
     text = re.sub(r'[^\w\s.]', '', text)
     text = text.replace('.', '.\n')
     return text
 
-def text_to_speech(text, output_file,voice):
+import platform
+def text_to_speech(text, output_file, voice):
     engine = pyttsx3.init()
     engine.setProperty('rate', 150)
-    voices = engine.getProperty('voices')
-    engine.setProperty('voice', voices[voice].id)
+    if platform.system() == 'Windows':
+        voices = engine.getProperty('voices')
+        engine.setProperty('voice', voices[voice].id)
     cleaned_text = clean_text_for_speech(text)
     engine.save_to_file(cleaned_text, output_file)
     engine.runAndWait()
+
 
 # Set page config
 st.set_page_config(page_title="Research Paper to Audio", layout="wide", page_icon="🔊")
