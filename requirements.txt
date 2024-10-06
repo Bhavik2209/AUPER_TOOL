@@ -4,4 +4,3 @@ pyttsx3
 google-generativeai
 streamlit-extras
 streamlit-option-menu
-espeak-ng
