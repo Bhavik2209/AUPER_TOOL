@@ -7,18 +7,10 @@ from streamlit_extras.stylable_container import stylable_container
 from streamlit_option_menu import option_menu
 import time
 
-try:
-    GOOGLE_API_KEY = st.secrets['default']['GOOGLE_API_KEY']
-except KeyError:
-    st.error("GOOGLE_API_KEY not found in Streamlit secrets. Please set it up.")
-    st.stop()
+GOOGLE_API_KEY = st.secrets['default']['GOOGLE_API_KEY']
 
 # Configure the Gemini API
-try:
-    genai.configure(api_key=GOOGLE_API_KEY)
-except Exception as e:
-    st.error(f"Failed to configure Gemini API: {str(e)}")
-    st.stop()
+genai.configure(api_key=GOOGLE_API_KEY)
 
 def extract_text_from_pdf(file):
     reader = PyPDF2.PdfReader(file)
