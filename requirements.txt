@@ -1,6 +1,7 @@
+gTTS
 streamlit
 PyPDF2
-pyttsx3
 google-generativeai
 streamlit-extras
 streamlit-option-menu
+google-auth>=2.0.0
