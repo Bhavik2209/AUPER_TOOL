@@ -9,6 +9,12 @@ import tempfile
 from streamlit_extras.stylable_container import stylable_container
 from streamlit_option_menu import option_menu
 import time
+import pyttsx3
+
+
+# Try setting a different engine (e.g., sapi5 or nsss) if supported by your environment
+
+
 
 try:
     GOOGLE_API_KEY = st.secrets['default']['GOOGLE_API_KEY']
@@ -62,6 +68,7 @@ def text_to_speech(text, output_file,voice):
     engine = pyttsx3.init()
     engine.setProperty('rate', 150)
     voices = engine.getProperty('voices')
+    engine.setProperty('voice', 'sapi5')
     engine.setProperty('voice', voices[voice].id)
     cleaned_text = clean_text_for_speech(text)
     engine.save_to_file(cleaned_text, output_file)
