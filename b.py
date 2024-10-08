@@ -1,21 +1,27 @@
 import streamlit as st
 import PyPDF2
+import os
 from gtts import gTTS
+import pyttsx3
 import google.generativeai as genai
 import re
+import tempfile
 from streamlit_extras.stylable_container import stylable_container
 from streamlit_option_menu import option_menu
 import time
-import os
 
 try:
-    GOOGLE_API_KEY = st.secrets["default"]["GOOGLE_API_KEY"]
+    GOOGLE_API_KEY = st.secrets['default']['GOOGLE_API_KEY']
 except KeyError:
     st.error("GOOGLE_API_KEY not found in Streamlit secrets. Please set it up.")
     st.stop()
 
 # Configure the Gemini API
-genai.configure(api_key=GOOGLE_API_KEY)
+try:
+    genai.configure(api_key=GOOGLE_API_KEY)
+except Exception as e:
+    st.error(f"Failed to configure Gemini API: {str(e)}")
+    st.stop()
 
 def extract_text_from_pdf(file):
     reader = PyPDF2.PdfReader(file)
@@ -47,9 +53,19 @@ def summarize_with_gemini(text):
     response = model.generate_content(prompt)
     return response.text
 
-def text_to_speech_gtts(text, output_file, language='en'):
-    tts = gTTS(text, lang=language)
-    tts.save(output_file)
+def clean_text_for_speech(text):
+    text = re.sub(r'[^\w\s.]', '', text)
+    text = text.replace('.', '.\n')
+    return text
+
+def text_to_speech(text, output_file,voice):
+    engine = pyttsx3.init()
+    engine.setProperty('rate', 150)
+    voices = engine.getProperty('voices')
+    engine.setProperty('voice', voices[voice].id)
+    cleaned_text = clean_text_for_speech(text)
+    engine.save_to_file(cleaned_text, output_file)
+    engine.runAndWait()
 
 # Set page config
 st.set_page_config(page_title="Research Paper to Audio", layout="wide", page_icon="🔊")
@@ -96,7 +112,11 @@ if selected == "Home":
     with col1:
         with stylable_container(
             key="file_uploader",
-            css_styles=""""""
+            css_styles="""
+                {
+                    
+                }
+                """
         ):
             uploaded_file = st.file_uploader("Upload your PDF file", type="pdf")
 
@@ -108,6 +128,15 @@ if selected == "Home":
                 st.write(f"File size: {uploaded_file.size} bytes")
 
             output_file = st.text_input("Enter output file name (including .mp3 extension)", "output.mp3")
+            
+            voice_option = st.radio(
+                "Select Voice",
+                options=["Male Voice", "Female Voice"],
+                index=1  # Default to Female Voice
+            )
+            
+            # Set voice based on selection
+            voice = 0 if voice_option == "Male Voice" else 1
             
             if st.button("Convert to Audio", key="convert"):
                 with st.spinner("Converting... This may take a few minutes."):
@@ -129,8 +158,8 @@ if selected == "Home":
                         full_summary += chunk_summary + "\n\n"
                         progress_bar.progress(40 + (i + 1) * 30 // len(chunks))
                     
-                    # Convert summary to speech using gTTS
-                    text_to_speech_gtts(full_summary, output_file)
+                    # Convert summary to speech
+                    text_to_speech(full_summary, output_file,voice)
                     progress_bar.progress(100)
                     
                     time.sleep(1)  # Give users a moment to see the 100% progress
@@ -149,7 +178,8 @@ if selected == "Home":
         st.markdown("""
         ### How it works:
         1. Upload your PDF file
-        2. Convert PDF file to Audio file.
+        2. Convert PDF file to
+            Audio file.
         3. Download it 
         """)
 
