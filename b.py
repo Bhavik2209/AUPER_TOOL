@@ -9,7 +9,7 @@ import time
 import os
 
 try:
-    GOOGLE_API_KEY = st.secrets["defalut"]["GOOGLE_API_KEY"]
+    GOOGLE_API_KEY = st.secrets["default"]["GOOGLE_API_KEY"]
 except KeyError:
     st.error("GOOGLE_API_KEY not found in Streamlit secrets. Please set it up.")
     st.stop()
