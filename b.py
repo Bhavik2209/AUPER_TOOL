@@ -1,40 +1,35 @@
 import streamlit as st
 import PyPDF2
-import os
 from gtts import gTTS
-import pyttsx3
 import google.generativeai as genai
 import re
-import tempfile
 from streamlit_extras.stylable_container import stylable_container
 from streamlit_option_menu import option_menu
 import time
-import pyttsx3
+import os
 
-
-# Try setting a different engine (e.g., sapi5 or nsss) if supported by your environment
-
-
-
-try:
-    GOOGLE_API_KEY = st.secrets['default']['GOOGLE_API_KEY']
-except KeyError:
-    st.error("GOOGLE_API_KEY not found in Streamlit secrets. Please set it up.")
-    st.stop()
+GOOGLE_API_KEY = st.secrets['default']['GOOGLE_API_KEY']
 
 # Configure the Gemini API
-try:
-    genai.configure(api_key=GOOGLE_API_KEY)
-except Exception as e:
-    st.error(f"Failed to configure Gemini API: {str(e)}")
-    st.stop()
+genai.configure(api_key=GOOGLE_API_KEY)
 
 def extract_text_from_pdf(file):
     reader = PyPDF2.PdfReader(file)
     text = ""
     for page in reader.pages:
         text += page.extract_text()
+    
     return text
+
+def clean_text(text):
+    # Remove special characters like * or @
+    text = re.sub(r"[*@#^&(){}\[\]:;<>,.!?]", "", text)
+    
+    # Optionally, replace multiple spaces with a single space
+    text = re.sub(r"\s+", " ", text).strip()
+    
+    return text
+
 
 def chunk_text(text, chunk_size=3000):
     words = text.split()
@@ -59,20 +54,14 @@ def summarize_with_gemini(text):
     response = model.generate_content(prompt)
     return response.text
 
-def clean_text_for_speech(text):
-    text = re.sub(r'[^\w\s.]', '', text)
-    text = text.replace('.', '.\n')
-    return text
+def text_to_speech_gtts(text, output_file, language='en'):
+    # Clean the text to remove special characters
+    cleaned_text = clean_text(text)
+    
+    # Generate speech from cleaned text
+    tts = gTTS(cleaned_text, lang=language)
+    tts.save(output_file)
 
-def text_to_speech(text, output_file,voice):
-    engine = pyttsx3.init()
-    engine.setProperty('rate', 150)
-    voices = engine.getProperty('voices')
-    engine.setProperty('voice', 'sapi5')
-    engine.setProperty('voice', voices[voice].id)
-    cleaned_text = clean_text_for_speech(text)
-    engine.save_to_file(cleaned_text, output_file)
-    engine.runAndWait()
 
 # Set page config
 st.set_page_config(page_title="Research Paper to Audio", layout="wide", page_icon="🔊")
@@ -112,18 +101,14 @@ with st.sidebar:
 
 # Main app
 if selected == "Home":
-    st.title("📑➜🔊 Research Paper to Audio Converter 𝚟2")
+    st.title("📑➜🔊 Research Paper to Audio Converter")
 
     col1, col2 = st.columns([2, 1])
 
     with col1:
         with stylable_container(
             key="file_uploader",
-            css_styles="""
-                {
-                    
-                }
-                """
+            css_styles=""""""
         ):
             uploaded_file = st.file_uploader("Upload your PDF file", type="pdf")
 
@@ -135,15 +120,6 @@ if selected == "Home":
                 st.write(f"File size: {uploaded_file.size} bytes")
 
             output_file = st.text_input("Enter output file name (including .mp3 extension)", "output.mp3")
-            
-            voice_option = st.radio(
-                "Select Voice",
-                options=["Male Voice", "Female Voice"],
-                index=1  # Default to Female Voice
-            )
-            
-            # Set voice based on selection
-            voice = 0 if voice_option == "Male Voice" else 1
             
             if st.button("Convert to Audio", key="convert"):
                 with st.spinner("Converting... This may take a few minutes."):
@@ -165,8 +141,8 @@ if selected == "Home":
                         full_summary += chunk_summary + "\n\n"
                         progress_bar.progress(40 + (i + 1) * 30 // len(chunks))
                     
-                    # Convert summary to speech
-                    text_to_speech(full_summary, output_file,voice)
+                    # Convert summary to speech using gTTS
+                    text_to_speech_gtts(full_summary, output_file)
                     progress_bar.progress(100)
                     
                     time.sleep(1)  # Give users a moment to see the 100% progress
@@ -185,8 +161,7 @@ if selected == "Home":
         st.markdown("""
         ### How it works:
         1. Upload your PDF file
-        2. Convert PDF file to
-            Audio file.
+        2. Convert PDF file to Audio file.
         3. Download it 
         """)
 
