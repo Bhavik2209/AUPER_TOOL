@@ -105,7 +105,7 @@ with st.sidebar:
 
 # Main app
 if selected == "Home":
-    st.title("📑➜🔊 Research Paper to Audio Converter")
+    st.title("📑➜🔊 Research Paper to Audio Converter 𝚟2")
 
     col1, col2 = st.columns([2, 1])
 
