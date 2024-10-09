@@ -136,7 +136,7 @@ if selected == "Home":
             key="file_uploader",
             css_styles=""""""
         ):
-            uploaded_file = st.file_uploader("Upload your PDF file", type="pdf")
+            uploaded_file = st.file_uploader("Upload your PDF file (must not exceed 4 pages or 1.5 MB)", type="pdf")
 
         if uploaded_file is not None:
             st.success("File uploaded successfully!")
