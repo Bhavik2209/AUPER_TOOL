@@ -6,13 +6,19 @@ import re
 from streamlit_extras.stylable_container import stylable_container
 from streamlit_option_menu import option_menu
 import time
+import concurrent.futures
+import zipfile
+import io
 import os
 
-GOOGLE_API_KEY = st.secrets['default']['GOOGLE_API_KEY']
+GOOGLE_API_KEY = st.secrets["default"]["GOOGLE_API_KEY"]
 
 # Configure the Gemini API
 genai.configure(api_key=GOOGLE_API_KEY)
 
+
+
+@st.cache_data
 def extract_text_from_pdf(file):
     reader = PyPDF2.PdfReader(file)
     text = ""
@@ -61,6 +67,27 @@ def text_to_speech_gtts(text, output_file, language='en'):
     tts = gTTS(cleaned_text, lang=language)
     tts.save(output_file)
 
+def generate_timestamps(text):
+    sentences = re.split(r'(?<=[.!?])\s+', text)
+    timestamps = []
+    current_time = 0
+    for i, sentence in enumerate(sentences):
+        words = len(sentence.split())
+        duration = words * 0.5
+        if i % 5 == 0:
+            timestamps.append(f"Section {i//5 + 1}: {current_time:.2f}s")
+        current_time += duration
+    return timestamps
+
+def process_chunk(chunk):
+    return summarize_with_gemini(chunk)
+
+def create_zip_file(audio_file, timestamps_file, summary_file):
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
+        for file in [audio_file, timestamps_file, summary_file]:
+            zip_file.write(file, os.path.basename(file))
+    return zip_buffer
 
 # Set page config
 st.set_page_config(page_title="Research Paper to Audio", layout="wide", page_icon="🔊")
@@ -132,29 +159,79 @@ if selected == "Home":
                     # Chunk the text
                     chunks = chunk_text(text)
                     progress_bar.progress(40)
+
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        summaries = list(executor.map(process_chunk, chunks))
+                
+                    full_summary = "\n\n".join(summaries)
+                    progress_bar.progress(60)
                     
-                    # Generate summary for each chunk
-                    full_summary = ""
-                    for i, chunk in enumerate(chunks):
-                        chunk_summary = summarize_with_gemini(chunk)
-                        full_summary += chunk_summary + "\n\n"
-                        progress_bar.progress(40 + (i + 1) * 30 // len(chunks))
+                    # Generate timestamps
+                    timestamps = generate_timestamps(full_summary)
+                    progress_bar.progress(70)
                     
-                    # Convert summary to speech using gTTS
+                    # Convert summary to speech
                     text_to_speech_gtts(full_summary, output_file)
+                    progress_bar.progress(90)
+                    
+                    # Save timestamps to a text file
+                    timestamps_file = output_file.replace('.mp3', '_timestamps.txt')
+                    with open(timestamps_file, 'w') as f:
+                        f.write("\n".join(timestamps))
+                    
+                    summary_file = output_file.replace('.mp3', '_summary.txt')
+                    with open(summary_file, 'w') as f:
+                        f.write(full_summary)
+                    
                     progress_bar.progress(100)
-                    
-                    time.sleep(1)  # Give users a moment to see the 100% progress
                     st.success("Conversion complete!")
+
+                    # Display audio player with timestamps
+                    st.audio(output_file)
                     
-                    # Offer file for download
-                    with open(output_file, "rb") as file:
-                        btn = st.download_button(
-                            label="Download Audio",
-                            data=file,
-                            file_name=output_file,
-                            mime="audio/mpeg"
+                    # Display timestamps as buttons
+                    # st.write("### Timestamps")
+                    # for stamp in timestamps:
+                    #     section, time = stamp.split(": ")
+                    #     if st.button(f"{section} - {time}"):
+                    #         st.audio(output_file, start_time=int(float(time[:-1])))
+                    
+                    # Offer files for download
+                    col1, col2, col3,col4= st.columns(4)
+                    with col1:
+                        with open(output_file, "rb") as file:
+                            st.download_button(
+                                label="Download Audio",
+                                data=file,
+                                file_name=output_file,
+                                mime="audio/mpeg"
+                            )
+                    with col2:
+                        with open(timestamps_file, "rb") as file:
+                            st.download_button(
+                                label="Download Timestamps",
+                                data=file,
+                                file_name=timestamps_file,
+                                mime="text/plain"
+                            )
+                    with col3:
+                        with open(summary_file, "rb") as file:
+                            st.download_button(
+                                label="Download Summary",
+                                data=file,
+                                file_name=summary_file,
+                                mime="text/plain"
+                            )
+                    with col4:
+                        zip_buffer = create_zip_file(output_file, timestamps_file, summary_file)
+                        st.download_button(
+                            label="Download All (ZIP)",
+                            data=zip_buffer.getvalue(),
+                            file_name="audio_timestamps_and_summary.zip",
+                            mime="application/zip"
                         )
+                    
+
 
     with col2:
         st.markdown("""
